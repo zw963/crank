@@ -1,0 +1,7 @@
+#!/usr/bin/env crystal
+
+# require "../src/foreman.cr"
+
+require "../src/foreman/cli.cr"
+
+Foreman::CLI.start
