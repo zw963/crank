@@ -83,7 +83,7 @@ module Foreman
         @readers[pid] = reader
       end
 
-      # puts @running
+      puts @running
       puts @readers
     end
 
