@@ -17,25 +17,42 @@ colors = %i(green
  light_cyan
 )
 
-commands = ["ping -c 5 google.com", "ping -c 5 pizzahut.com"]
-channel = Channel(String).new
+commands = [["google", "ping -c 5 google.com"], ["pizzahut", "ping -c 5 pizzahut.com"]]
+channel = Channel(Bool).new
 
-commands.each_with_index do |command, index|
+def build_output(name, output, commands)
+  names = commands.map { |c| c.first }
+  longest_name = names.map { |n| n.size }.max
+
+  filler_spaces = ""
+  (longest_name - name.size).times do
+    filler_spaces += " "
+  end
+
+  "#{Time.now.to_s("%H:%M:%S")} #{name} #{filler_spaces}| #{output.to_s}"
+end
+
+commands.each_with_index do |signature, index|
+  name = signature[0]
+  command = signature[1]
   _, output = IO.pipe(write_blocking: true)
   output.colorize
   color = colors[index]
 
   spawn do
-    process = Process.new(command, shell: true, input: true, output: nil, error: true)
-    output = process.output.gets
-    STDOUT << output.to_s.colorize(color)
+    process = Process.new(command, shell: true, input: false, output: nil, error: nil)
+    while output = process.output.gets
+      STDOUT << build_output(name, output, commands).colorize(color)
+    end
     status = process.wait
     # $? = status
     # output
-    channel.send "Done"
+    channel.send true
   end
 end
 
 commands.each do
-  puts channel.receive.colorize
+  channel.receive
 end
+
+puts "DONE"
