@@ -1,7 +1,6 @@
+require "colorize"
 require "../foreman.cr"
-require "./helpers.cr"
 require "./engine.cr"
-require "./engine/cli.cr"
 
 # require "foreman/export"
 # require "foreman/version"
@@ -10,16 +9,17 @@ require "./engine/cli.cr"
 
 module Foreman
   class CLI
+    ERROR_COLOR = :red
+
     def self.start(process = nil)
       check_procfile!
-      engine = Foreman::Engine::CLI.new
+      engine = Foreman::Engine.new
       engine.load_procfile(procfile)
-      # engine.options[:formation] = "#{process}=1" if process
       engine.start
     end
 
     def self.error(message)
-      puts "ERROR: #{message}"
+      puts "ERROR: #{message}".colorize(ERROR_COLOR)
       exit 1
     end
 

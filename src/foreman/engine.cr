@@ -5,58 +5,37 @@ require "../foreman/procfile.cr"
 module Foreman
   class Engine
     # The signals that the engine cares about.
-    #
     HANDLED_SIGNALS = [:TERM, :INT, :HUP]
 
     property :processes
-    property :timeout
 
-    # Create an +Engine+ for running processes
+    # Create an *Engine* for running processes
     #
     # @param [Hash] options
     #
     # @option options [Fixnum] :port      (5000)     The base port to assign to processes
     # @option options [String] :root      (Dir.pwd)  The root directory from which to run processes
-    #
     def initialize
-      @options = Hash(Symbol, Int32 | String).new
-
-      @timeout = 5
-
-      @mutex = Mutex.new
-      @names = {} of Foreman::Process => String
-      @processes = [] of Foreman::Process
-      @names = {} of Foreman::Process => String
-      @running = {} of Process::Status | Nil => Array(Int32 | Foreman::Process)
-      @readers = {} of String | Nil | Process::Status => IO::FileDescriptor
-
-      # Self-pipe for deferred signal-handling (ala djb: http://cr.yp.to/docs/selfpipe.html)
-      reader, writer = create_pipe
-      @selfpipe = {:reader => reader, :writer => writer}
-
-      # Set up a global signal queue
-      # http://blog.rubybestpractices.com/posts/ewong/016-Implementing-Signal-Handlers.html
-      # Thread.main[:signal_queue] = Array.new
-    end
-
-    private def create_pipe
-      IO.pipe
+      @commands = {} of String => String
+      @processes = {} of String => Foreman::Process
+      # @names = {} of Foreman::Process => String
+      # @running = {} of Process::Status | Nil => Array(Int32 | Foreman::Process)
+      # @readers = {} of String | Nil | Process::Status => IO::FileDescriptor
     end
 
     # Register processes by reading a Procfile
     #
     # @param [String] filename  A Procfile from which to read processes to register
-    #
     def load_procfile(filename : String)
       root = File.dirname(filename)
       Foreman::Procfile.new(filename).entries do |name, command|
-        puts "#{name} : #{command}"
-        register name, command, {:cwd => root}
+        puts "#{name} :: #{command}"
+        register name, command
       end
       self
     end
 
-    # Start the processes registered to this +Engine+
+    # Start the processes registered to this *Engine*
     #
     def start
       # register_signal_handlers
@@ -87,7 +66,7 @@ module Foreman
       puts @readers
     end
 
-    # Register a process to be run by this +Engine+
+    # Register a process to be run by this *Engine*
     #
     # @param [String] name     A name for this process
     # @param [String] command  The command to run
@@ -95,11 +74,8 @@ module Foreman
     #
     # @option options [Hash] :env  A custom environment for this process
     #
-    def register(name : String, command : String, options = Hash(Symbol, String))
-      options[:cwd] = File.dirname(command.split(" ").first)
-      process = Foreman::Process.new(command, options)
-      @names[process] = name
-      @processes << process
+    def register(name : String, command : String)
+      @processes[name] = Foreman::Process.new(command)
     end
 
 
@@ -162,7 +138,7 @@ module Foreman
     #   retry
     # end
 
-    # Invoke the real handler for signal +sig+. This shouldn't be called directly
+    # Invoke the real handler for signal *sig*. This shouldn't be called directly
     # by signal handlers, as it might invoke code which isn't re-entrant.
     #
     # @param [Symbol] sig  the name of the signal to be handled
@@ -201,7 +177,7 @@ module Foreman
       terminate_gracefully
     end
 
-    # Clear the processes registered to this +Engine+
+    # Clear the processes registered to this *Engine*
     #
     def clear
       @names = Hash.new
@@ -209,7 +185,7 @@ module Foreman
     end
 
 
-    # Load a .env file into the +env+ for this +Engine+
+    # Load a .env file into the *env* for this *Engine*
     #
     # @param [String] filename  A .env file to load into the environment
     #
@@ -219,7 +195,7 @@ module Foreman
       end
     end
 
-    # Send a signal to all processes started by this +Engine+
+    # Send a signal to all processes started by this *Engine*
     #
     # @param [String] signal  The signal to send to each process
     #
@@ -249,17 +225,17 @@ module Foreman
       @processes.map { |p| @names[p] }
     end
 
-    # Get the +Process+ for a specifid name
+    # Get the *Process* for a specifid name
     #
     # @param [String] name  The process name
     #
-    # @returns [Foreman::Process]  The +Process+ for the specified name
+    # @returns [Foreman::Process]  The *Process* for the specified name
     #
     # def process(name)
     #   @names.invert[name]
     # end
 
-    # Yield each +Process+ in order
+    # Yield each *Process* in order
     #
     def each_process
       process_names.each do |name|
@@ -267,7 +243,7 @@ module Foreman
       end
     end
 
-    # Get the root directory for this +Engine+
+    # Get the root directory for this *Engine*
     #
     # @returns [String]  The root directory
     #
@@ -277,46 +253,28 @@ module Foreman
 
     # Get the port for a given process and offset
     #
-    # @param [Foreman::Process] process   A +Process+ associated with this engine
+    # @param [Foreman::Process] process   A *Process* associated with this engine
     # @param [Fixnum]           instance  The instance of the process
     #
     # @returns [Fixnum] port  The port to use for this instance of this process
     #
-    def port_for(process, instance, base = nil)
-      if base
-        base + (@processes.index(process.process) * 100) + (instance - 1)
-      else
-        base_port + (@processes.index(process) * 100) + (instance - 1)
-      end
-    end
+    # def port_for(process, instance, base = nil)
+    #   if base
+    #     base + (@processes.index(process.process) * 100) + (instance - 1)
+    #   else
+    #     base_port + (@processes.index(process) * 100) + (instance - 1)
+    #   end
+    # end
 
     # Get the base port for this foreman instance
     #
     # @returns [Fixnum] port  The base port
     #
-    def base_port
+    # def base_port
       # (options[:port] || env["PORT"] || ENV["PORT"] || 5000).to_i
-      5000
-    end
+    #   5000
+    # end
 
-    # deprecated
-    def environment
-      env
-    end
-
-    # ## Engine API ######################################################
-
-    private def startup
-      raise TypeError, "must use a subclass of Foreman::Engine"
-    end
-
-    private def output(name, data)
-      raise TypeError, "must use a subclass of Foreman::Engine"
-    end
-
-    private def shutdown
-      raise TypeError, "must use a subclass of Foreman::Engine"
-    end
 
     # # Helpers ##########################################################
 
