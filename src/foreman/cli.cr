@@ -2,11 +2,6 @@ require "colorize"
 require "../foreman.cr"
 require "./engine.cr"
 
-# require "foreman/export"
-# require "foreman/version"
-# require "shellwords"
-# require "yaml"
-
 module Foreman
   class CLI
     ERROR_COLOR = :red

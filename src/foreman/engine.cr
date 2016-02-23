@@ -1,13 +1,28 @@
 require "../foreman.cr"
-require "../foreman/process.cr"
-require "../foreman/procfile.cr"
+require "./process.cr"
+require "./procfile.cr"
 
 module Foreman
   class Engine
     # The signals that the engine cares about.
     HANDLED_SIGNALS = [:TERM, :INT, :HUP]
+    COLORS = %i(green
+     yellow
+     blue
+     magenta
+     cyan
+     light_gray
+     dark_gray
+     light_red
+     light_green
+     light_yellow
+     light_blue
+     light_magenta
+     light_cyan
+    )
+    ERROR_COLOR = :red
 
-    property :processes
+    property :writer
 
     # Create an *Engine* for running processes
     #
@@ -16,11 +31,11 @@ module Foreman
     # @option options [Fixnum] :port      (5000)     The base port to assign to processes
     # @option options [String] :root      (Dir.pwd)  The root directory from which to run processes
     def initialize
+      _, @output = IO.pipe(write_blocking: true)
+      @output.colorize
+      @channel = Channel(Bool).new
       @commands = {} of String => String
       @processes = {} of String => Foreman::Process
-      # @names = {} of Foreman::Process => String
-      # @running = {} of Process::Status | Nil => Array(Int32 | Foreman::Process)
-      # @readers = {} of String | Nil | Process::Status => IO::FileDescriptor
     end
 
     # Register processes by reading a Procfile
@@ -29,54 +44,94 @@ module Foreman
     def load_procfile(filename : String)
       root = File.dirname(filename)
       Foreman::Procfile.new(filename).entries do |name, command|
-        puts "#{name} :: #{command}"
         register name, command
       end
-      self
-    end
-
-    # Start the processes registered to this *Engine*
-    #
-    def start
-      # register_signal_handlers
-      startup
-      spawn_processes
-      # watch_for_output
-      # sleep 0.1
-      # watch_for_termination { terminate_gracefully }
-      # shutdown
-    end
-
-    private def spawn_processes
-      @processes.each do |process|
-        # 1.upto(formation[@names[process]]) do |n|
-        n = 1
-        reader, writer = create_pipe
-        begin
-          pid = process.run(writer, name_for_index(process, n))
-          writer.puts "started with pid #{pid}"
-        rescue #Errno::ENOENT
-          writer.puts "unknown command: #{process.command}"
-        end
-        @running[pid] = [process, n]
-        @readers[pid] = reader
-      end
-
-      puts @running
-      puts @readers
     end
 
     # Register a process to be run by this *Engine*
     #
     # @param [String] name     A name for this process
     # @param [String] command  The command to run
-    # @param [Hash]   options
-    #
-    # @option options [Hash] :env  A custom environment for this process
-    #
-    def register(name : String, command : String)
+    private def register(name : String, command : String)
       @processes[name] = Foreman::Process.new(command)
     end
+
+
+    # Start the processes registered to this *Engine*
+    #
+    def start
+      # write "starting", :blue
+      # register_signal_handlers
+      # startup
+      spawn_processes
+      watch_for_output
+      # sleep 0.1
+      # watch_for_termination { terminate_gracefully }
+      # shutdown
+    end
+
+    private def write(string : String, color : Symbol)
+      # @writer << string.colorize(color)
+      STDOUT << string.colorize(color)
+    end
+
+    private def spawn_processes
+      index = 0
+      @processes.each do |name, process|
+        index += 1
+        color = COLORS[index]
+        begin
+          process.run do |output|
+            spawn do
+              while process_output = output.gets
+                write build_output(name, process_output), color
+              end
+              status = process.wait
+              @channel.send true
+            end
+          end
+
+          write "started with pid #{process.pid}", color
+        rescue #Errno::ENOENT
+          write "unknown command: #{process.command}", ERROR_COLOR
+        end
+      end
+    end
+
+    private def build_output(name, output)
+      names = @commands.keys
+      longest_name = names.map { |n| n.size }.max
+
+      filler_spaces = ""
+      (longest_name - name.size).times do
+        filler_spaces += " "
+      end
+
+      "#{Time.now.to_s("%H:%M:%S")} #{name} #{filler_spaces}| #{output.to_s}"
+    end
+
+    private def watch_for_output
+      @processes.each do
+        @channel.receive
+      end
+      puts "DONE!"
+    end
+
+
+      # Thread.new do
+      #   begin
+      #     loop do
+      #       io = IO.select([@selfpipe[:reader]] + @readers.values, nil, nil, 30)
+      #       read_self_pipe
+      #       handle_signals
+      #       handle_io(io ? io.first : Array.new)
+      #     end
+      #   rescue ex : Exception
+      #     puts ex.message
+      #     puts ex.backtrace
+      #   end
+    #   end
+    # end
 
 
 
@@ -158,42 +213,42 @@ module Foreman
 
     # Handle a TERM signal
     #
-    def handle_term_signal
-      puts "SIGTERM received"
-      terminate_gracefully
-    end
+    # def handle_term_signal
+    #   puts "SIGTERM received"
+    #   terminate_gracefully
+    # end
 
     # Handle an INT signal
     #
-    def handle_interrupt
-      puts "SIGINT received"
-      terminate_gracefully
-    end
+    # def handle_interrupt
+    #   puts "SIGINT received"
+    #   terminate_gracefully
+    # end
 
     # Handle a HUP signal
     #
-    def handle_hangup
-      puts "SIGHUP received"
-      terminate_gracefully
-    end
+    # def handle_hangup
+    #   puts "SIGHUP received"
+    #   terminate_gracefully
+    # end
 
     # Clear the processes registered to this *Engine*
     #
-    def clear
-      @names = Hash.new
-      @processes = [Foreman::Process]
-    end
+    # def clear
+    #   @names = Hash.new
+    #   @processes = [Foreman::Process]
+    # end
 
 
     # Load a .env file into the *env* for this *Engine*
     #
     # @param [String] filename  A .env file to load into the environment
     #
-    def load_env(filename)
-      Foreman::Env.new(filename).entries do |name, value|
-        @env[name] = value
-      end
-    end
+    # def load_env(filename)
+    #   Foreman::Env.new(filename).entries do |name, value|
+    #     @env[name] = value
+    #   end
+    # end
 
     # Send a signal to all processes started by this *Engine*
     #
@@ -221,9 +276,9 @@ module Foreman
     #
     # @returns [Array]  A list of process names
     #
-    def process_names
-      @processes.map { |p| @names[p] }
-    end
+    # def process_names
+    #   @processes.map { |p| @names[p] }
+    # end
 
     # Get the *Process* for a specifid name
     #
@@ -237,19 +292,19 @@ module Foreman
 
     # Yield each *Process* in order
     #
-    def each_process
-      process_names.each do |name|
-        yield name, process(name)
-      end
-    end
+    # def each_process
+    #   process_names.each do |name|
+    #     yield name, process(name)
+    #   end
+    # end
 
     # Get the root directory for this *Engine*
     #
     # @returns [String]  The root directory
     #
-    def root
-      File.expand_path(options[:root] || Dir.pwd)
-    end
+    # def root
+    #   File.expand_path(options[:root] || Dir.pwd)
+    # end
 
     # Get the port for a given process and offset
     #
@@ -284,9 +339,9 @@ module Foreman
     #   name_for_index(process, index)
     # end
 
-    private def name_for_index(process : Foreman::Process, index : Int)
-      [@names[process], index.to_s].compact.join(".")
-    end
+    # private def name_for_index(process : Foreman::Process, index : Int)
+    #   [@names[process], index.to_s].compact.join(".")
+    # end
 
     # private def output_with_mutex(name, message)
     #   @mutex.synchronize do
@@ -317,46 +372,46 @@ module Foreman
 
     # # Engine ###########################################################
 
-    private def read_self_pipe
-      @selfpipe[:reader].read_nonblock(11)
-    rescue Errno::EAGAIN | Errno::EINTR | Errno::EBADF
-      # ignore
-    end
+    # private def read_self_pipe
+    #   @selfpipe[:reader].read_nonblock(11)
+    # rescue Errno::EAGAIN | Errno::EINTR | Errno::EBADF
+    #   # ignore
+    # end
 
-    private def handle_signals
-      while sig = Thread.main[:signal_queue].shift
-        self.handle_signal(sig)
-      end
-    end
+    # private def handle_signals
+    #   while sig = Thread.main[:signal_queue].shift
+    #     self.handle_signal(sig)
+    #   end
+    # end
 
-    private def handle_io(readers)
-      readers.each do |reader|
-        next if reader == @selfpipe[:reader]
+    # private def handle_io(readers)
+    #   readers.each do |reader|
+    #     next if reader == @selfpipe[:reader]
 
-        if reader.eof?
-          @readers.delete_if { |key, value| value == reader }
-        else
-          data = reader.gets
-          output_with_mutex name_for(@readers.invert[reader]), data
-        end
-      end
-    end
+    #     if reader.eof?
+    #       @readers.delete_if { |key, value| value == reader }
+    #     else
+    #       data = reader.gets
+    #       output_with_mutex name_for(@readers.invert[reader]), data
+    #     end
+    #   end
+    # end
 
-    private def watch_for_output
-      Thread.new do
-        begin
-          loop do
-            io = IO.select([@selfpipe[:reader]] + @readers.values, nil, nil, 30)
-            read_self_pipe
-            handle_signals
-            handle_io(io ? io.first : Array.new)
-          end
-        rescue ex : Exception
-          puts ex.message
-          puts ex.backtrace
-        end
-      end
-    end
+    # private def watch_for_output
+    #   Thread.new do
+    #     begin
+    #       loop do
+    #         io = IO.select([@selfpipe[:reader]] + @readers.values, nil, nil, 30)
+    #         read_self_pipe
+    #         handle_signals
+    #         handle_io(io ? io.first : Array.new)
+    #       end
+    #     rescue ex : Exception
+    #       puts ex.message
+    #       puts ex.backtrace
+    #     end
+    #   end
+    # end
 
     # private def watch_for_termination
     #   pid, status = Process.wait2

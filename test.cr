@@ -32,11 +32,11 @@ def build_output(name, output, commands)
   "#{Time.now.to_s("%H:%M:%S")} #{name} #{filler_spaces}| #{output.to_s}"
 end
 
+_, output = IO.pipe(write_blocking: true)
+output.colorize
 commands.each_with_index do |signature, index|
   name = signature[0]
   command = signature[1]
-  _, output = IO.pipe(write_blocking: true)
-  output.colorize
   color = colors[index]
 
   spawn do

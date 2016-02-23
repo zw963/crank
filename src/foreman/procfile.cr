@@ -4,13 +4,15 @@ module Foreman
     #
     # @param [String] filename (nil)  An optional filename to read from
     def initialize(filename = nil : String)
-      @entries = [] of Hash(String => String)
+      @entries = [] of Array(String)
       load(filename) if filename
     end
 
     # Yield each *Procfile* entry in order
     def entries(&blk)
-      @entries.each do |name, command|
+      @entries.each do |entry|
+        name = entry[0]
+        command = entry[1]
         yield name, command
       end
     end
@@ -40,7 +42,7 @@ module Foreman
     private def parse(filename)
       File.read(filename).gsub("\r\n", "\n").split("\n").map do |line|
         if line =~ /^([A-Za-z0-9_-]+):\s*(.+)$/
-          { $1 => $2 }
+          [$1, $2]
         end
       end.compact
     end
