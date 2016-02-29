@@ -7,17 +7,14 @@ module Timeout
     channel = Channel(Bool).new
     spawn do
       sleep seconds
-      puts "done sleeping"
       channel.send false
     end
 
     spawn do
-      puts "yielding"
       block.call
       channel.send true
     end
 
-    puts channel.receive
     # if value = channel.receive
     #   if value == true
     #     puts "true"
