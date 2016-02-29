@@ -1,6 +1,7 @@
 require "../foreman.cr"
 require "./process.cr"
 require "./procfile.cr"
+require "./timeout.cr"
 
 module Foreman
   class Engine
@@ -21,6 +22,7 @@ module Foreman
      light_cyan
     )
     ERROR_COLOR = :red
+    SYSTEM_COLOR = :white
 
     property :writer
 
@@ -31,11 +33,13 @@ module Foreman
     # @option options [Fixnum] :port      (5000)     The base port to assign to processes
     # @option options [String] :root      (Dir.pwd)  The root directory from which to run processes
     def initialize
-      _, @output = IO.pipe(write_blocking: true)
-      @output.colorize
-      @channel = Channel(Bool).new
-      @commands = {} of String => String
-      @processes = {} of String => Foreman::Process
+      # _, @output = IO.pipe(write_blocking: true)
+      # @output.colorize
+      @output = STDOUT
+      @channel = Channel(Int32).new
+      @processes = [] of Foreman::Process
+      @running = {} of Int32 => Foreman::Process
+      @terminating = false
     end
 
     # Register processes by reading a Procfile
@@ -53,7 +57,7 @@ module Foreman
     # @param [String] name     A name for this process
     # @param [String] command  The command to run
     private def register(name : String, command : String)
-      @processes[name] = Foreman::Process.new(command)
+      @processes << Foreman::Process.new(name, command)
     end
 
 
@@ -64,43 +68,50 @@ module Foreman
       # register_signal_handlers
       # startup
       spawn_processes
-      watch_for_output
+      watch_for_ended_processes
       # sleep 0.1
       # watch_for_termination { terminate_gracefully }
       # shutdown
     end
 
-    private def write(string : String, color : Symbol)
+    private def write(string : String, color = SYSTEM_COLOR : Symbol)
       # @writer << string.colorize(color)
-      STDOUT << string.colorize(color)
+      @output << "#{string}\n".colorize(color)
     end
 
     private def spawn_processes
-      index = 0
-      @processes.each do |name, process|
-        index += 1
+      @processes.each_with_index do |process, index|
+        name = process.name
         color = COLORS[index]
         begin
-          process.run do |output|
+          process.run do |output, error|
             spawn do
-              while process_output = output.gets
-                write build_output(name, process_output), color
+              spawn do
+                while process_output = output.gets
+                  write build_output(name, process_output), color
+                end
               end
+              spawn do
+                while process_error = error.gets
+                  write build_output(name, process_error), ERROR_COLOR
+                end
+              end
+
               status = process.wait
-              @channel.send true
+              @channel.send process.pid
             end
           end
 
-          write "started with pid #{process.pid}", color
+          @running[process.pid] = process
+          write build_output(name, "started with pid #{process.pid}"), color
         rescue #Errno::ENOENT
-          write "unknown command: #{process.command}", ERROR_COLOR
+          write build_output(name, "unknown command: #{process.command}"), ERROR_COLOR
         end
       end
     end
 
     private def build_output(name, output)
-      names = @commands.keys
-      longest_name = names.map { |n| n.size }.max
+      longest_name = @processes.map { |p| p.name.size }.max
 
       filler_spaces = ""
       (longest_name - name.size).times do
@@ -110,30 +121,48 @@ module Foreman
       "#{Time.now.to_s("%H:%M:%S")} #{name} #{filler_spaces}| #{output.to_s}"
     end
 
-    private def watch_for_output
-      @processes.each do
-        @channel.receive
+    private def watch_for_ended_processes
+      if ended_pid = @channel.receive
+        ended_process = @running[ended_pid]
+
+        if id = @running.delete ended_pid
+          terminate_gracefully
+        end
+
+        write build_output(ended_process.name, "exited!")
       end
-      puts "DONE!"
     end
 
+    private def kill_children(signal = Signal::TERM)
+      @running.each do |pid|
+        spawn do
+          ::Process.kill signal, pid
+          @running.delete pid
+          puts pid
+          @channel.send pid
+        end
+      end
+    end
 
-      # Thread.new do
-      #   begin
-      #     loop do
-      #       io = IO.select([@selfpipe[:reader]] + @readers.values, nil, nil, 30)
-      #       read_self_pipe
-      #       handle_signals
-      #       handle_io(io ? io.first : Array.new)
-      #     end
-      #   rescue ex : Exception
-      #     puts ex.message
-      #     puts ex.backtrace
-      #   end
-    #   end
-    # end
+    private def terminate_gracefully
+      return if @terminating
+      # restore_default_signal_handlers
+      @terminating = true
 
+      write "sending SIGTERM to all processes"
+      kill_children Signal::TERM
 
+      timeout = 3
+      Timeout.timeout(timeout) do
+        while @running.size > 0
+          puts @running.size
+          sleep 0.1
+        end
+      end
+    rescue Timeout::Error
+      write "sending SIGKILL to all processes"
+      kill_children Signal::KILL
+    end
 
 
 

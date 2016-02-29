@@ -1,2 +1,3 @@
-one: echo true
-two: ping google.com
+one: ping -c 5 google.com
+two: ping -c 5 pizzahut.com
+three: sleep 2; exit
