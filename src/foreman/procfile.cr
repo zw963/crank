@@ -9,7 +9,7 @@ module Foreman
     end
 
     # Yield each *Procfile* entry in order
-    def entries(&blk)
+    def entries(&block)
       @entries.each do |entry|
         name = entry[0]
         command = entry[1]

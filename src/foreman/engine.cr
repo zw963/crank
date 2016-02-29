@@ -1,7 +1,8 @@
 require "../foreman.cr"
+require "./timeout.cr"
 require "./process.cr"
 require "./procfile.cr"
-require "./timeout.cr"
+require "./env.cr"
 
 module Foreman
   class Engine
@@ -40,6 +41,7 @@ module Foreman
       @processes = [] of Foreman::Process
       @running = {} of Int32 => Foreman::Process
       @terminating = false
+      @env = {} of String => String
     end
 
     # Register processes by reading a Procfile
@@ -52,12 +54,19 @@ module Foreman
       end
     end
 
+    def load_env(filename : String)
+      root = File.dirname(filename)
+      Foreman::Env.new(filename).entries do |key, value|
+        @env[key.to_s] = value.to_s
+      end
+    end
+
     # Register a process to be run by this *Engine*
     #
     # @param [String] name     A name for this process
     # @param [String] command  The command to run
     private def register(name : String, command : String)
-      @processes << Foreman::Process.new(name, command)
+      @processes << Foreman::Process.new(name, command, @env)
     end
 
 
@@ -178,11 +187,11 @@ module Foreman
       write "."
       case signal
       when Signal::TERM
-        puts "SIGTERM received"
+        write "SIGTERM received"
       when Signal::INT
-        puts "SIGINT received"
+        write "SIGINT received"
       when Signal::HUP
-        puts "SIGHUP received"
+        write "SIGHUP received"
       else
         write "unhandled signal #{signal}"
       end
@@ -190,25 +199,13 @@ module Foreman
       terminate_gracefully
     end
 
-
-
-
-
-
-
-
-
-
-
-
     # Load a .env file into the *env* for this *Engine*
     #
     # @param [String] filename  A .env file to load into the environment
-    #
-    # def load_env(filename)
-    #   Foreman::Env.new(filename).entries do |name, value|
-    #     @env[name] = value
-    #   end
-    # end
+    def load_env(filename)
+      Foreman::Env.new(filename).entries do |name, value|
+        @env[name] = value
+      end
+    end
   end
 end

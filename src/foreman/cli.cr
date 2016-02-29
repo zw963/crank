@@ -10,6 +10,7 @@ module Foreman
       check_procfile!
       engine = Foreman::Engine.new
       engine.load_procfile(procfile)
+      engine.load_env(dotenv)
       engine.start
     end
 
@@ -24,6 +25,10 @@ module Foreman
 
     def self.procfile
       "Procfile"
+    end
+
+    def self.dotenv
+      ".env"
     end
   end
 end

@@ -14,26 +14,6 @@ module Timeout
       block.call
       channel.send true
     end
-
-    # if value = channel.receive
-    #   if value == true
-    #     puts "true"
-    #   else
-    #     puts "false"
-    #   end
-    #   channel.close
-    # end
-    # puts "listening"
-    # if channel.receive == true
-    #   puts "true"
-    #   channel.close
-    # elsif channel.receive == false
-    #   puts "false"
-    #   channel.close
-    #   raise error
-    # else
-    #   puts "Asdf"
-    # end
   end
 
   class Error < Exception
