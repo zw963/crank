@@ -9,18 +9,18 @@ module Foreman
     # The signals that the engine cares about.
     HANDLED_SIGNALS = [Signal::TERM, Signal::INT, Signal::HUP]
     COLORS = %i(green
-     yellow
-     blue
-     magenta
-     cyan
-     light_gray
-     dark_gray
-     light_red
-     light_green
-     light_yellow
-     light_blue
-     light_magenta
-     light_cyan
+      yellow
+      blue
+      magenta
+      cyan
+      light_gray
+      dark_gray
+      light_red
+      light_green
+      light_yellow
+      light_blue
+      light_magenta
+      light_cyan
     )
     ERROR_COLOR = :red
     SYSTEM_COLOR = :white
