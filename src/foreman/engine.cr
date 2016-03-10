@@ -27,12 +27,7 @@ module Foreman
 
     property :writer
 
-    # Create an *Engine* for running processes
-    #
-    # @param [Hash] options
-    #
-    # @option options [Fixnum] :port      (5000)     The base port to assign to processes
-    # @option options [String] :root      (Dir.pwd)  The root directory from which to run processes
+    # Initializes the Engine and sets instance variables
     def initialize
       # _, @output = IO.pipe(write_blocking: true)
       # @output.colorize
@@ -44,16 +39,17 @@ module Foreman
       @env = {} of String => String
     end
 
-    # Register processes by reading a Procfile
-    #
-    # @param [String] filename  A Procfile from which to read processes to register
+    # Populate the list of processes from the given Procfile
+    # @param [String] filename  A Procfile from which to populate processes
     def load_procfile(filename : String)
       root = File.dirname(filename)
       Foreman::Procfile.new(filename).entries do |name, command|
-        register name, command
+        @processes << Foreman::Process.new(name, command, @env)
       end
     end
 
+    # Populate runtime environment variables from a .env file
+    # @param [String] filename  A .env file from which to populate ENV variables
     def load_env(filename : String)
       root = File.dirname(filename)
       Foreman::Env.new(filename).entries do |key, value|
@@ -61,26 +57,17 @@ module Foreman
       end
     end
 
-    # Register a process to be run by this *Engine*
-    #
-    # @param [String] name     A name for this process
-    # @param [String] command  The command to run
-    private def register(name : String, command : String)
-      @processes << Foreman::Process.new(name, command, @env)
-    end
-
-
-    # Start the processes registered to this *Engine*
-    #
+    # Starts the Engine processes and registers handlers
     def start
       register_signal_handlers
       spawn_processes
       watch_for_ended_processes
     end
 
-    private def write(string : String, color = SYSTEM_COLOR : Symbol)
+    private def write(string : String, color = SYSTEM_COLOR : Symbol, line_break = true : Bool)
       # @writer << string.colorize(color)
-      @output << "#{string}\n".colorize(color)
+      line_break_string = line_break ? "\n" : ""
+      @output << "#{string}#{line_break_string}".colorize(color)
     end
 
     private def spawn_processes
@@ -92,13 +79,13 @@ module Foreman
             spawn do
               spawn do
                 while process_output = output.gets
-                  write build_output(name, process_output), color
+                  write build_output(name, process_output), color, false
                 end
               end
 
               spawn do
                 while process_error = error.gets
-                  write build_output(name, process_error), ERROR_COLOR
+                  write build_output(name, process_error), ERROR_COLOR, false
                 end
               end
 
@@ -197,15 +184,6 @@ module Foreman
       end
 
       terminate_gracefully
-    end
-
-    # Load a .env file into the *env* for this *Engine*
-    #
-    # @param [String] filename  A .env file to load into the environment
-    def load_env(filename)
-      Foreman::Env.new(filename).entries do |name, value|
-        @env[name] = value
-      end
     end
   end
 end

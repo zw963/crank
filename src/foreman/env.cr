@@ -1,11 +1,13 @@
 module Foreman
   class Env
-    def initialize(filename = nil : String)
+    # Initialize and load commands from a .env file
+    # @param [String] filename The filename
+    def initialize(filename = nil)
       @entries = [] of Array(String)
       load(filename) if filename
     end
 
-    # Yield each *Procfile* entry in order
+    # Yield each *Procfile* entry with key and value
     def entries(&block)
       @entries.each do |entry|
         key = entry[0]
@@ -14,7 +16,7 @@ module Foreman
       end
     end
 
-    def load(filename)
+    private def load(filename)
       @entries = parse(filename)
     end
 
