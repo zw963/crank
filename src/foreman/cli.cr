@@ -9,8 +9,8 @@ module Foreman
     def self.start(process = nil)
       check_procfile!
       engine = Foreman::Engine.new
-      engine.load_procfile(procfile)
       engine.load_env(dotenv)
+      engine.load_procfile(procfile)
       engine.start
     end
 

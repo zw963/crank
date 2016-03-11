@@ -7,7 +7,7 @@ require "./env.cr"
 module Foreman
   class Engine
     # The signals that the engine cares about.
-    HANDLED_SIGNALS = [Signal::TERM, Signal::INT, Signal::HUP]
+    HANDLED_SIGNALS = [Signal::TERM, Signal::INT, Signal::HUP, Signal::ABRT]
     COLORS = %i(green
       yellow
       blue
@@ -59,6 +59,7 @@ module Foreman
 
     # Starts the Engine processes and registers handlers
     def start
+      delay(2) { terminate_gracefully }
       register_signal_handlers
       spawn_processes
       watch_for_ended_processes
@@ -128,7 +129,14 @@ module Foreman
     private def kill_children(signal = Signal::TERM)
       @running.each do |pid|
         spawn do
-          ::Process.kill signal, pid
+          begin
+            ::Process.kill signal, pid
+          rescue
+            if signal == Signal::TERM
+              kill_children Signal::KILL
+            end
+          end
+
           @running.delete pid
           @channel.send pid
         end
@@ -143,18 +151,20 @@ module Foreman
       write "sending SIGTERM to all processes"
       kill_children Signal::TERM
 
-      timeout = 3
-      Timeout.timeout(timeout) do
+      timeout = 60
+
+      timeout_error_handler = -> do
+        write "sending SIGKILL to all processes"
+        kill_children Signal::KILL
+      end
+
+      Timeout.timeout(timeout, timeout_error_handler) do
         while @running.size > 0
           print "."
           sleep 0.1
         end
       end
-    rescue Timeout::Error
-      write "sending SIGKILL to all processes"
-      kill_children Signal::KILL
     end
-
 
     private def register_signal_handlers
       HANDLED_SIGNALS.each do |signal|
