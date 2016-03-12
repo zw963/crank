@@ -1,3 +1,5 @@
 /.crystal
 /man/*.html
 /man/*.markdown
+Procfile
+.env
