@@ -10,7 +10,7 @@ Clone this repo
 
 `git clone https://github.com/arktisklada/crank.cr`
 
-Symlink `crank` to `bin/crank`
+Symlink `/usr/bin/crank` (or your bin folder) to `bin/crank` in your cloned repo.
 
 ## Usage
 
@@ -34,4 +34,4 @@ Inspired by the original [Foreman](https://github.com/ddollar/foreman) by David 
 
 ## License
 
-Apache 2.0 &copy; 2016 Clayton Liggitt
+(Apache 2.0)[http://www.apache.org/licenses/LICENSE-2.0] &copy; 2016 Clayton Liggitt
