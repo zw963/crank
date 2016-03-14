@@ -1,4 +1,4 @@
-module Foreman
+module Crank
   class Process
     getter :command, :name
 

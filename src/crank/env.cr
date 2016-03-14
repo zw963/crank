@@ -1,4 +1,4 @@
-module Foreman
+module Crank
   class Env
     # Initialize and load commands from a .env file
     # @param [String] filename The filename

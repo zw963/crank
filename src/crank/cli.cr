@@ -1,14 +1,14 @@
 require "colorize"
-require "../foreman.cr"
+require "../crank.cr"
 require "./engine.cr"
 
-module Foreman
+module Crank
   class CLI
     ERROR_COLOR = :red
 
     def self.start(process = nil)
       check_procfile!
-      engine = Foreman::Engine.new
+      engine = Crank::Engine.new
       engine.load_env(dotenv)
       engine.load_procfile(procfile)
       engine.start

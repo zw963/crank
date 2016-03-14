@@ -1,10 +1,10 @@
-require "../foreman.cr"
+require "../crank.cr"
 require "./timeout.cr"
 require "./process.cr"
 require "./procfile.cr"
 require "./env.cr"
 
-module Foreman
+module Crank
   class Engine
     # The signals that the engine cares about.
     HANDLED_SIGNALS = [Signal::TERM, Signal::INT, Signal::HUP, Signal::ABRT]
@@ -33,8 +33,8 @@ module Foreman
       # @output.colorize
       @output = STDOUT
       @channel = Channel(Int32).new
-      @processes = [] of Foreman::Process
-      @running = {} of Int32 => Foreman::Process
+      @processes = [] of Crank::Process
+      @running = {} of Int32 => Crank::Process
       @terminating = false
       @env = {} of String => String
     end
@@ -43,8 +43,8 @@ module Foreman
     # @param [String] filename  A Procfile from which to populate processes
     def load_procfile(filename : String)
       root = File.dirname(filename)
-      Foreman::Procfile.new(filename).entries do |name, command|
-        @processes << Foreman::Process.new(name, command, @env)
+      Crank::Procfile.new(filename).entries do |name, command|
+        @processes << Crank::Process.new(name, command, @env)
       end
     end
 
@@ -52,7 +52,7 @@ module Foreman
     # @param [String] filename  A .env file from which to populate ENV variables
     def load_env(filename : String)
       root = File.dirname(filename)
-      Foreman::Env.new(filename).entries do |key, value|
+      Crank::Env.new(filename).entries do |key, value|
         @env[key.to_s] = value.to_s
       end
     end

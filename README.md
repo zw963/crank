@@ -1,4 +1,4 @@
-# Foreman.cr
+# Crank
 
 Foreman in Crystal
 
@@ -8,9 +8,9 @@ This is very much a work in progress.
 
 Clone this repo
 
-`git clone https://github.com/arktisklada/Foreman.cr`
+`git clone https://github.com/arktisklada/crank.cr`
 
-Symlink `foreman` to `bin/foreman`
+Symlink `crank` to `bin/crank`
 
 ## Usage
 
@@ -21,7 +21,7 @@ web: bin/server 7000
 worker: bin/worker queue=FOO
 ```
 
-Run `foreman`
+Run `crank`
 
 ```
 17:12:48 web    | listening on port 7000

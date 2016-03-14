@@ -1,4 +1,4 @@
-module Foreman
+module Crank
   class Procfile
     # Initialize and load commands from a Procfile
     # @param [String] filename  The filename
