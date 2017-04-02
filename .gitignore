@@ -3,3 +3,6 @@
 /man/*.markdown
 Procfile
 .env
+bc_flags
+crank.o
+crank
