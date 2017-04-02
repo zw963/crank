@@ -35,7 +35,7 @@ module Crank
           end
         end.compact
       else
-        Array(String).new
+        [Array(String).new]
       end
     end
   end

@@ -27,6 +27,8 @@ module Crank
 
     property :writer
 
+    @output : IO::FileDescriptor
+
     # Initializes the Engine and sets instance variables
     def initialize
       # _, @output = IO.pipe(write_blocking: true)
@@ -59,15 +61,17 @@ module Crank
 
     # Starts the Engine processes and registers handlers
     def start
-      delay(2) { terminate_gracefully }
+      #delay(2) { terminate_gracefully }
       register_signal_handlers
       spawn_processes
       watch_for_ended_processes
     end
 
-    private def write(string : String, color = SYSTEM_COLOR : Symbol, line_break = true : Bool)
-      # @writer << string.colorize(color)
-      line_break_string = line_break ? "\n" : ""
+    private def write(string : String, color : Symbol = SYSTEM_COLOR, line_break : Bool = true)
+      line_break_string = ""
+      if line_break || string[-2] != "\n"
+        line_break_string = "\n"
+      end
       @output << "#{string}#{line_break_string}".colorize(color)
     end
 
@@ -80,13 +84,13 @@ module Crank
             spawn do
               spawn do
                 while process_output = output.gets
-                  write build_output(name, process_output), color, false
+                  write build_output(name, process_output), color, true
                 end
               end
 
               spawn do
                 while process_error = error.gets
-                  write build_output(name, process_error), ERROR_COLOR, false
+                  write build_output(name, process_error), ERROR_COLOR, true
                 end
               end
 
@@ -116,18 +120,19 @@ module Crank
 
     private def watch_for_ended_processes
       if ended_pid = @channel.receive
-        ended_process = @running[ended_pid]
+        if @running.has_key? ended_pid
+          ended_process = @running[ended_pid]
+          write build_output(ended_process.name, "exited!")
 
-        if id = @running.delete ended_pid
-          terminate_gracefully
+          if id = @running.delete ended_pid
+            terminate_gracefully
+          end
         end
-
-        write build_output(ended_process.name, "exited!")
       end
     end
 
     private def kill_children(signal = Signal::TERM)
-      @running.each do |pid|
+      @running.each_key do |pid|
         spawn do
           begin
             ::Process.kill signal, pid
@@ -163,6 +168,7 @@ module Crank
           print "."
           sleep 0.1
         end
+        print "\n"
       end
     end
 
@@ -181,7 +187,6 @@ module Crank
     end
     
     private def handle_signal(signal)
-      write "."
       case signal
       when Signal::TERM
         write "SIGTERM received"

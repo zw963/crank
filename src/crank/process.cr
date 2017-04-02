@@ -13,7 +13,7 @@ module Crank
     end
 
     def wait
-      @status ||= @process.wait
+      @process.wait
     end
 
     def pid
