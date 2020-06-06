@@ -5,4 +5,5 @@ Procfile
 .env
 bc_flags
 crank.o
-crank
+./crank
+bin/
