@@ -7,7 +7,7 @@ require "./env.cr"
 module Crank
   class Engine
     HANDLED_SIGNALS = [Signal::TERM, Signal::INT, Signal::HUP, Signal::ABRT]
-    COLORS = %i(green
+    COLORS          = %i(green
       yellow
       blue
       magenta
@@ -21,7 +21,7 @@ module Crank
       light_magenta
       light_cyan
     )
-    ERROR_COLOR = :red
+    ERROR_COLOR  = :red
     SYSTEM_COLOR = :white
 
     property :writer
@@ -34,9 +34,9 @@ module Crank
       # _, @output = IO.pipe(write_blocking: true)
       # @output.colorize
       @output = STDOUT
-      @channel = Channel(Int32).new
+      @channel = Channel(Int64).new
       @processes = [] of Crank::Process
-      @running = {} of Int32 => Crank::Process
+      @running = {} of Int64 => Crank::Process
       @terminating = false
       @env = {} of String => String
     end
@@ -143,7 +143,7 @@ module Crank
       running.each_key do |pid|
         spawn do
           begin
-            ::Process.kill signal, pid
+            ::Process.signal signal, pid
           rescue
             if signal == Signal::TERM
               kill_children Signal::KILL

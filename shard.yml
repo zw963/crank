@@ -5,13 +5,17 @@ authors:
   - Andy Nicholson (@anicholson) - Maintenance
 
 version: 0.2.0
-  
-description : |
+
+description: |
   A crystal port of the popular Foreman project by @ddollar
 
 targets:
   crank:
     main: src/crank.cr
+
+dependencies:
+  future:
+    github: crystal-community/future.cr
 
 executables:
   - crank
