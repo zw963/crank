@@ -5,8 +5,8 @@ require "./engine.cr"
 module Crank
   class CLI
     ERROR_COLOR = :red
-    PROCFILE = "Procfile"
-    DOT_ENV = ".env"
+    PROCFILE    = "Procfile"
+    DOT_ENV     = ".env"
 
     def self.start
       check_procfile!
